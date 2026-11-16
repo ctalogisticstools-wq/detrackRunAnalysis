@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fleet run analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>Fleet run analysis</h1>
+  <p class="sub">Drop the delivery items file and one or more GPS route files. Every driver's stops are matched to their deliveries, with arrival, departure, stay, travel time and delivery status.</p>
+
+  <section class="panel">
+    <div id="drop" tabindex="0" role="button" aria-label="Choose Excel files">
+      <b>Drop Excel files here, or click to choose</b><br>
+      <span class="sub" style="margin:4px 0 0">Delivery items file and route files</span>
+    </div>
+    <input id="file" type="file" accept=".xlsx,.xls" multiple class="hide">
+    <p class="msg" id="loaded">No files loaded yet.</p>
+    
+    <div class="row" style="margin-top:10px">
+      <label class="f">Road factor (road km per straight-line km)<input id="fac" type="number" step="0.05" min="1" value="1.3"></label>
+      <label class="f">Average speed for estimates (km/h)<input id="spd" type="number" step="1" min="10" value="45"></label>
+      
+      <label class="f">Link GPS route to driver (optional)
+        <select id="linkRoute" style="padding:6px;border-radius:4px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;min-width:220px;">
+          <option value="">Auto-match by name</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <div id="out" class="hide">
+    <section class="panel">
+      <div class="bar">
+        <h2 style="margin:0">All drivers</h2>
+        <button id="exp">Export all drivers to Excel</button>
+      </div>
+      <div class="tw">
+        <table id="sum"></table>
+      </div>
+      <p class="msg" id="xmsg"></p>
+    </section>
+
+    <section class="panel">
+      <h2 id="dh"></h2>
+      <div class="kpis" id="kp"></div>
+      <div id="tl"></div>
+      <div class="ax"><span id="t0"></span><span id="t1"></span></div>
+      <div class="tw" style="margin-top:12px">
+        <table id="runt"></table>
+      </div>
+      <p class="note">Arrival and departure are the first and last GPS pings at a stop. Est. travel is straight-line distance × road factor ÷ average speed; actual travel is arrival minus the previous departure. Stops of 5+ minutes that match no job are listed in grey.</p>
+    </section>
+  </div>
+</main>
+
+<script src="utils.js"></script>
+<script src="analysis.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
