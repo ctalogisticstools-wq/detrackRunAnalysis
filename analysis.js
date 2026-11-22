@@ -1,13 +1,21 @@
-let jobs = {}, tracks = {}, res = {}, cur = null, manualLinks = {};
+// SINGLE GLOBAL STATE OBJECT
+const AppState = {
+  jobs: {},
+  tracks: {},
+  res: {},
+  cur: null,
+  manualLinks: {},
+  claimsData: {}
+};
 
 function analyse(d, f, v) {
-  let trackKey = Object.keys(tracks).find(k => k === d || k.replace(/_/g, ' ').toUpperCase() === d.replace(/_/g, ' ').toUpperCase());
-  if (manualLinks[d]) trackKey = manualLinks[d];
+  let trackKey = Object.keys(AppState.tracks).find(k => k === d || k.replace(/_/g, ' ').toUpperCase() === d.replace(/_/g, ' ').toUpperCase());
+  if (AppState.manualLinks[d]) trackKey = AppState.manualLinks[d];
   
-  const P = trackKey ? tracks[trackKey] : [];
+  const P = trackKey ? AppState.tracks[trackKey] : [];
   const S = P.length ? stops(P) : [];
   
-  const js = Object.values(jobs).filter(j => String(j['Assign to'] || '').trim().toUpperCase() === d.toUpperCase());
+  const js = Object.values(AppState.jobs).filter(j => String(j['Assign to'] || '').trim().toUpperCase() === d.toUpperCase());
 
   const items = js.map(j => {
     const p = toSec(j['POD Time']);
@@ -68,8 +76,6 @@ function analyse(d, f, v) {
   });
 
   const J = rows.filter(r => r.k === 'job');
-  
-  const totalJobs = J.length;
   const deliveredJobs = J.filter(r => r.status === 'Delivered');
   const outsideWindowCount = deliveredJobs.filter(r => r.outsideWindow).length;
   
@@ -84,7 +90,7 @@ function analyse(d, f, v) {
     d, rows,
     t0: P.length ? P[0].t : null, t1: P.length ? P[P.length - 1].t : null,
     hasGps: !!P.length,
-    jobs: totalJobs, del: deliveredJobs.length, nd: J.filter(r => r.status !== 'Delivered').length,
+    jobs: J.length, del: deliveredJobs.length, nd: J.filter(r => r.status !== 'Delivered').length,
     km: P.reduce((x, p) => x + p.km, 0),
     nomatch: J.filter(r => !r.st).length,
     avgStopTime: avgStopTime,
@@ -96,15 +102,15 @@ function analyse(d, f, v) {
 
 function run() {
   const f = +$('#fac').value || 1.3, v = +$('#spd').value || 45;
-  res = {};
+  AppState.res = {};
   
-  const jobDrivers = Object.values(jobs).map(j => String(j['Assign to'] || '').trim()).filter(Boolean);
+  const jobDrivers = Object.values(AppState.jobs).map(j => String(j['Assign to'] || '').trim()).filter(Boolean);
   const uniqueDs = [...new Set(jobDrivers)];
   
-  uniqueDs.forEach(d => { res[d] = analyse(d, f, v); });
+  uniqueDs.forEach(d => { AppState.res[d] = analyse(d, f, v); });
   
-  if (!Object.keys(res).length) { $('#out').classList.add('hide'); return; }
-  if (!res[cur]) cur = Object.keys(res)[0];
+  if (!Object.keys(AppState.res).length) { $('#out').classList.add('hide'); return; }
+  if (!AppState.res[AppState.cur]) AppState.cur = Object.keys(AppState.res)[0];
   
   $('#out').classList.remove('hide');
   drawSum();
