@@ -48,6 +48,13 @@ function analyse(d, f, v) {
 
     if (st) {
       o.a = st.a; o.d = st.d; o.stay = (st.d - st.a) / 60; o.gps = st.loc;
+      
+      if (o.by != null) {
+        o.outsideWindow = o.a > o.by;
+      } else {
+        o.outsideWindow = false;
+      }
+
       if (it.si === prev) {
         o.shared = 1; o.act = 0; o.est = 0;
       } else {
@@ -61,15 +68,29 @@ function analyse(d, f, v) {
   });
 
   const J = rows.filter(r => r.k === 'job');
-  const M = J.filter(r => r.st && !r.shared);
+  
+  const totalJobs = J.length;
+  const deliveredJobs = J.filter(r => r.status === 'Delivered');
+  const outsideWindowCount = deliveredJobs.filter(r => r.outsideWindow).length;
+  
+  const uniqueStops = J.filter(r => r.st && !r.shared);
+  let totalStayMins = 0;
+  uniqueStops.forEach(r => { totalStayMins += r.stay; });
+  const avgStopTime = uniqueStops.length > 0 ? (totalStayMins / uniqueStops.length) : 0;
+  
+  const driverHours = (P.length > 0) ? ((P[P.length-1].t - P[0].t) / 3600) : 0;
 
   return {
     d, rows,
     t0: P.length ? P[0].t : null, t1: P.length ? P[P.length - 1].t : null,
     hasGps: !!P.length,
-    jobs: J.length, del: J.filter(r => r.status === 'Delivered').length, nd: J.filter(r => r.status !== 'Delivered').length,
+    jobs: totalJobs, del: deliveredJobs.length, nd: J.filter(r => r.status !== 'Delivered').length,
     km: P.reduce((x, p) => x + p.km, 0),
-    nomatch: J.filter(r => !r.st).length
+    nomatch: J.filter(r => !r.st).length,
+    avgStopTime: avgStopTime,
+    outsideWindow: outsideWindowCount,
+    driverHours: driverHours,
+    outputPerHour: driverHours > 0 ? (deliveredJobs.length / driverHours) : 0
   };
 }
 
