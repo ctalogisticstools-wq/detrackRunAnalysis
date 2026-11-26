@@ -7,7 +7,6 @@ function drawSum() {
     return '';
   };
 
-  // Renamed 'Total Act. Travel' to 'Total Travel Time'
   let h = `<tr>
     <th style="cursor:pointer;" onclick="sortSum('d')">Driver${sortIcon('d')}</th>
     <th class="n" style="cursor:pointer;" onclick="sortSum('jobs')">Jobs${sortIcon('jobs')}</th>
@@ -74,7 +73,6 @@ function drawDriver() {
   
   if (AppState.claimsData[AppState.cur] === undefined) AppState.claimsData[AppState.cur] = 0;
 
-  // Changed Total Act. Travel to Total Travel Time and used fmtDuration
   $('#kp').innerHTML = `
     <div><b>${r.estStartTime ? T(r.estStartTime) : '-'}</b><span>Est. Start Time</span></div>
     <div><b>${r.estFinishTime ? T(r.estFinishTime) : '-'}</b><span>Est. Finish Time (CTA)</span></div>
@@ -99,11 +97,46 @@ function drawDriver() {
   
   $('#t0').textContent = (r.hasGps && r.t0) ? T(r.t0) : '';
   $('#t1').textContent = (r.hasGps && r.t1) ? T(r.t1) : '';
-  
-  // Changed 'Act. travel (min)' to 'Travel time'
-  let h = '<tr><th>Ref</th><th>Cafe name</th><th>Address</th><th>Arrival</th><th>Departure</th><th class="n">Stay (min)</th><th>POD</th><th class="n">Travel time</th><th class="n">Dist (km)</th><th>Status</th><th>Deliver by</th></tr>';
-  
-  for (const x of r.rows) {
+
+  const sortIcon = (col) => {
+    if (AppState.detailSortCol === col) return AppState.detailSortAsc ? ' ▲' : ' ▼';
+    return '';
+  };
+
+  let h = `<tr>
+    <th style="cursor:pointer;" onclick="sortDetail('ref')">Ref${sortIcon('ref')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('name')">Cafe name${sortIcon('name')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('addr')">Address${sortIcon('addr')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('a')">Arrival${sortIcon('a')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('d')">Departure${sortIcon('d')}</th>
+    <th class="n" style="cursor:pointer;" onclick="sortDetail('stay')">Stay (min)${sortIcon('stay')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('pod')">POD${sortIcon('pod')}</th>
+    <th class="n" style="cursor:pointer;" onclick="sortDetail('act')">Travel time${sortIcon('act')}</th>
+    <th class="n" style="cursor:pointer;" onclick="sortDetail('estKm')">Dist (km)${sortIcon('estKm')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('status')">Status${sortIcon('status')}</th>
+    <th style="cursor:pointer;" onclick="sortDetail('by')">Deliver by${sortIcon('by')}</th>
+  </tr>`;
+
+  // Apply sorting to the detail rows
+  const sortedRows = [...r.rows].sort((a, b) => {
+    let valA = a[AppState.detailSortCol];
+    let valB = b[AppState.detailSortCol];
+    
+    // Keep the depot row pinned to the top
+    if (valA === 'DEPOT') return -1;
+    if (valB === 'DEPOT') return 1;
+
+    if (valA == null) return 1;
+    if (valB == null) return -1;
+
+    if (typeof valA === 'string') {
+      return AppState.detailSortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    } else {
+      return AppState.detailSortAsc ? valA - valB : valB - valA;
+    }
+  });
+
+  for (const x of sortedRows) {
     if (x.k === 'oth' && !x.st) continue; 
 
     let rowStyle = '';
@@ -125,6 +158,16 @@ function drawDriver() {
     </tr>`;
   }
   $('#runt').innerHTML = h;
+}
+
+function sortDetail(col) {
+  if (AppState.detailSortCol === col) {
+    AppState.detailSortAsc = !AppState.detailSortAsc;
+  } else {
+    AppState.detailSortCol = col;
+    AppState.detailSortAsc = true;
+  }
+  drawDriver();
 }
 
 function updateClaims(val) {
