@@ -5,7 +5,17 @@ const AppState = {
   res: {},
   cur: null,
   manualLinks: {},
-  claimsData: {}
+  claimsData: {},
+  sortCol: 'd',
+  sortAsc: true
+};
+
+// Hardcoded Depot Information
+const DEPOT_INFO = {
+  name: 'CTA Logistics',
+  address: '13/20 Blomberg Rd, Altona North VIC 3025',
+  lat: -37.8347,
+  lng: 144.8455
 };
 
 function analyse(d, f, v) {
@@ -39,7 +49,7 @@ function analyse(d, f, v) {
   
   items.sort((x, y) => (x.si == null) - (y.si == null) || (x.si - y.si) || (x.k === 'oth') - (y.k === 'oth') || ((x.p || 0) - (y.p || 0)));
 
-  let pd = P.length ? P[0].t : null, pl = P.length ? P[0].lat : 0, pg = P.length ? P[0].lng : 0, prev = -1;
+  let pd = null, pl = 0, pg = 0, prev = -1;
   
   const rows = items.map(it => {
     const st = it.si != null ? S[it.si] : null, o = { k: it.k, st, pod: it.p };
@@ -66,9 +76,13 @@ function analyse(d, f, v) {
       if (it.si === prev) {
         o.shared = 1; o.act = 0; o.est = 0;
       } else {
-        o.act = pd == null ? null : (st.a - pd) / 60;
-        o.est = pd == null ? null : hav(pl, pg, st.lat, st.lng) * f / v * 60;
-        o.estKm = pd == null ? null : hav(pl, pg, st.lat, st.lng) * f;
+        if (prev === -1) {
+          o.estKm = hav(DEPOT_INFO.lat, DEPOT_INFO.lng, st.lat, st.lng) * f;
+          o.act = null; 
+        } else {
+          o.act = pd == null ? null : (st.a - pd) / 60;
+          o.estKm = pd == null ? null : hav(pl, pg, st.lat, st.lng) * f;
+        }
         prev = it.si; pd = st.d; pl = st.dlat; pg = st.dlng;
       }
     }
@@ -76,6 +90,75 @@ function analyse(d, f, v) {
   });
 
   const J = rows.filter(r => r.k === 'job');
+  const firstJob = J.length > 0 ? J[0] : null;
+  const lastJobWithGps = [...J].reverse().find(r => r.st !== null);
+
+  // EST START TIME
+  let estStartTime = null;
+  if (firstJob && firstJob.pod && firstJob.estKm) {
+    const estTravelMins = (firstJob.estKm / v) * 60;
+    estStartTime = firstJob.pod - (estTravelMins * 60);
+  }
+
+  // ACTUAL FINISH TIME
+  let actualFinishTime = null;
+  let endedAtCta = false;
+  if (P.length > 0 && lastJobWithGps && lastJobWithGps.st) {
+    const lastPing = P[P.length - 1];
+    const distToDepot = hav(DEPOT_INFO.lat, DEPOT_INFO.lng, lastPing.lat, lastPing.lng);
+    
+    if (distToDepot <= 1.0) {
+      endedAtCta = true;
+      actualFinishTime = lastPing.t; 
+    } else {
+      for (let i = P.length - 1; i >= 0; i--) {
+        if (P[i].t < lastJobWithGps.st.d) break;
+        if (hav(DEPOT_INFO.lat, DEPOT_INFO.lng, P[i].lat, P[i].lng) <= 1.0) {
+          endedAtCta = true;
+          actualFinishTime = P[i].t;
+          break;
+        }
+      }
+    }
+  }
+
+  // EST FINISH TIME
+  let estFinishTime = null;
+  if (lastJobWithGps && lastJobWithGps.st) {
+    const estReturnKm = hav(lastJobWithGps.st.dlat, lastJobWithGps.st.dlng, DEPOT_INFO.lat, DEPOT_INFO.lng) * f;
+    const estReturnMins = (estReturnKm / v) * 60;
+    estFinishTime = lastJobWithGps.st.d + (estReturnMins * 60);
+  }
+
+  // LAST DELIVERY POD
+  let lastPodTime = null;
+  if (J.length > 0) {
+    if (endedAtCta && J.length > 1) {
+      lastPodTime = J[J.length - 2].pod;
+    } else {
+      lastPodTime = J[J.length - 1].pod;
+    }
+  }
+
+  // INSERT DEPOT ROW AT THE TOP
+  if (P.length > 0) {
+    const depotRow = {
+      k: 'depot',
+      ref: 'DEPOT',
+      name: DEPOT_INFO.name,
+      addr: DEPOT_INFO.address,
+      status: 'Start',
+      a: estStartTime ? estStartTime : P[0].t,
+      d: estStartTime ? estStartTime : P[0].t, 
+      stay: null,
+      act: null,
+      estKm: null,
+      shared: false,
+      outsideWindow: false
+    };
+    rows.unshift(depotRow);
+  }
+
   const deliveredJobs = J.filter(r => r.status === 'Delivered');
   const outsideWindowCount = deliveredJobs.filter(r => r.outsideWindow).length;
   
@@ -85,10 +168,28 @@ function analyse(d, f, v) {
   const avgStopTime = uniqueStops.length > 0 ? (totalStayMins / uniqueStops.length) : 0;
   
   const driverHours = (P.length > 0) ? ((P[P.length-1].t - P[0].t) / 3600) : 0;
+  const outputPerHour = driverHours > 0 ? (deliveredJobs.length / driverHours) : 0;
+
+  let totalEstTravel = 0;
+  let totalActTravel = 0;
+  
+  rows.forEach(r => { 
+    if (r.act) totalActTravel += r.act;
+  });
+  
+  // Est total hours now uses travel based on KM / Speed
+  let totalEstKm = 0;
+  rows.forEach(r => { if (r.estKm) totalEstKm += r.estKm; });
+  totalEstTravel = (totalEstKm / v) * 60;
+  
+  const estTotalHours = (totalEstTravel / 60) + (totalStayMins / 60);
+  const estOutputPerHour = estTotalHours > 0 ? (deliveredJobs.length / estTotalHours) : 0;
 
   return {
     d, rows,
-    t0: P.length ? P[0].t : null, t1: P.length ? P[P.length - 1].t : null,
+    t0: P.length ? P[0].t : null, 
+    t1: P.length ? P[P.length - 1].t : null,
+    estStartTime, estFinishTime, actualFinishTime, lastPodTime,
     hasGps: !!P.length,
     jobs: J.length, del: deliveredJobs.length, nd: J.filter(r => r.status !== 'Delivered').length,
     km: P.reduce((x, p) => x + p.km, 0),
@@ -96,7 +197,9 @@ function analyse(d, f, v) {
     avgStopTime: avgStopTime,
     outsideWindow: outsideWindowCount,
     driverHours: driverHours,
-    outputPerHour: driverHours > 0 ? (deliveredJobs.length / driverHours) : 0
+    outputPerHour: outputPerHour,
+    estOutputPerHour: estOutputPerHour,
+    totalActTravel: totalActTravel
   };
 }
 
