@@ -7,7 +7,9 @@ const AppState = {
   manualLinks: {},
   claimsData: {},
   sortCol: 'd',
-  sortAsc: true
+  sortAsc: true,
+  detailSortCol: 'a',
+  detailSortAsc: true
 };
 
 // Hardcoded Depot Information
@@ -74,7 +76,7 @@ function analyse(d, f, v) {
       }
 
       if (it.si === prev) {
-        o.shared = 1; o.act = 0; o.est = 0;
+        o.shared = 1; o.act = 0;
       } else {
         if (prev === -1) {
           o.estKm = hav(DEPOT_INFO.lat, DEPOT_INFO.lng, st.lat, st.lng) * f;
@@ -170,17 +172,14 @@ function analyse(d, f, v) {
   const driverHours = (P.length > 0) ? ((P[P.length-1].t - P[0].t) / 3600) : 0;
   const outputPerHour = driverHours > 0 ? (deliveredJobs.length / driverHours) : 0;
 
-  let totalEstTravel = 0;
   let totalActTravel = 0;
-  
   rows.forEach(r => { 
     if (r.act) totalActTravel += r.act;
   });
   
-  // Est total hours now uses travel based on KM / Speed
   let totalEstKm = 0;
   rows.forEach(r => { if (r.estKm) totalEstKm += r.estKm; });
-  totalEstTravel = (totalEstKm / v) * 60;
+  let totalEstTravel = (totalEstKm / v) * 60;
   
   const estTotalHours = (totalEstTravel / 60) + (totalStayMins / 60);
   const estOutputPerHour = estTotalHours > 0 ? (deliveredJobs.length / estTotalHours) : 0;
