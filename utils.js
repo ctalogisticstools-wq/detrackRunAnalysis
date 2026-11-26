@@ -22,6 +22,16 @@ const T = (s, sec) => {
 
 const n1 = v => v == null || isNaN(v) ? '' : (Math.round(v * 10) / 10).toFixed(1);
 
+// Formats minutes into "Xh Ym"
+const fmtDuration = mins => {
+  if (mins == null || isNaN(mins)) return '-';
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+};
+
 function hav(a, b, c, d) {
   const r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r, h = Math.sin(x / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) ** 2;
   return 12742 * Math.asin(Math.sqrt(h));
